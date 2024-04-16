@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "werag"
+version = "0.0.0"
+description = "python rag for wechat application"
+authors = ["zhenhao-ma <bob0103779@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pydantic = "^2.3.0"
+qdrant-client = "^1.7.0"
+redis = "^5.0.0"
+langchain-openai = "^0.0.2.post1"
+keble-helpers = "^0"
+keble-chains = "^0"
+keble-db = "^0"
+tenacity = "^8.2.3"
+
+[tool.poetry.group.test.dependencies]
+pydantic-settings = "^2.2.1"
+pytest = "^8.1.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
