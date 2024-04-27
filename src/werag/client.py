@@ -1,7 +1,9 @@
+import logging
 from pathlib import Path
 from typing import List
 from typing import Optional, Literal
 
+from langchain.chains import LLMChain
 from langchain.document_transformers import Html2TextTransformer
 from langchain_community.document_loaders import TextLoader
 from langchain_community.document_loaders.recursive_url_loader import RecursiveUrlLoader
@@ -10,10 +12,16 @@ from langchain_community.embeddings.sentence_transformer import (
 )
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
+from langchain_core.language_models import BaseChatModel
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from wechatpy import parse_message, create_reply
 
 from .crud import CRUDChroma
 from .db import get_chroma
 from .schema import UserContent
+
+logger = logging.getLogger(__name__)
 
 
 class WeRag:
@@ -34,16 +42,10 @@ class WeRag:
     def as_retriever(self, *, user: str,
                      content_type: Optional[str] = None,
                      search_type: Literal["similarity", "mmr", "similarity_score_threshold"] = "similarity",
-                     limit: int = 4,
-                     score_threshold: float = 0.8,
-                     fetch_k: int = 20,
-                     lambda_mult: float = 0.5):
+                     **kwargs):
         return self._chroma.as_retriever(search_kwargs={
-            # "k": limit,
-            # "score_threshold": score_threshold,
             "filter": self._crud.get_user_content_filter(user=user, content_type=content_type),
-            # "fetch_k": fetch_k,
-            # "lambda_mult": lambda_mult
+            **kwargs
         }, search_type=search_type)
 
     def save_content(self, *, user: str, content: str,
@@ -79,3 +81,62 @@ class WeRag:
             loader = TextLoader(filepath)
             docs += loader.load()
         return self.save_documents(user=user, content_type=content_type, documents=docs)
+
+    def response_wechat_xml(self, *, message: str,
+                            llm: BaseChatModel,
+                            user: str, content_type: Optional[str] = None,
+                            prompt_template: Optional[str] = None,
+                            ):
+        """ Handle message from wechat gongzhonghao
+        see: https://developers.weixin.qq.com/doc/offiaccount/Message_Management/Receiving_standard_messages.html
+        :param message: XML string from Wechat, example:
+                        <xml>
+                          <ToUserName><![CDATA[toUser]]></ToUserName>
+                          <FromUserName><![CDATA[fromUser]]></FromUserName>
+                          <CreateTime>1348831860</CreateTime>
+                          <MsgType><![CDATA[text]]></MsgType>
+                          <Content><![CDATA[this is a test]]></Content>
+                          <MsgId>1234567890123456</MsgId>
+                          <MsgDataId>xxxx</MsgDataId>
+                          <Idx>xxxx</Idx>
+                        </xml>
+        :return:
+        """
+
+        default_prompt_template = """
+        ### [INST] 
+        Instruction: 回复下述问题，这里是一些数据和资料供你参考：
+        
+        {context}
+        
+        ### QUESTION:
+        {question} 
+        
+        [/INST]
+        """
+        if prompt_template is None:
+            prompt_template = default_prompt_template
+
+        parsed_message = parse_message(message)
+        if parsed_message.type != "text": return create_reply("我目前只能响应文字内容", parsed_message, render=True)
+
+        # Abstraction of Prompt
+        prompt = ChatPromptTemplate.from_template(prompt_template)
+
+        # Creating an LLM Chain
+
+        llm_chain = LLMChain(llm=llm, prompt=prompt)
+
+        # RAG Chain
+        rag_chain = (
+                {"context": self.as_retriever(user=user, content_type=content_type),
+                 "question": RunnablePassthrough()}
+                | llm_chain
+        )
+        response_text = None
+        try:
+            response_text = rag_chain.invoke(parsed_message.content)
+            return create_reply(response_text['text'], parsed_message, render=True)
+        except Exception as e:
+            logger.critical(f"Failed to get response from LLM, exception: {e}, response: {response_text}")
+            return create_reply("系统出错了，没有得到任何回复。请联系管理员", parsed_message, render=True)

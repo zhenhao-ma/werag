@@ -4,8 +4,9 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 
 from werag.crud import CRUDChroma
-from .utils import prune_chroma, get_client
 from .llm import get_llm
+from .utils import prune_chroma, get_client
+
 crud = CRUDChroma(chunk_size=1000)
 client = get_client()
 
@@ -163,3 +164,28 @@ def test_client_as_retriever():
     response = rag_chain.invoke(query_1)
     assert "zhangwei" in response['text'].lower()
 
+
+def test_client_response_wechat_xml():
+    # create data
+    prune_chroma(client._chroma)
+    user = "user"
+    content_type = "personal"
+    client.import_files(user=user, filepaths=["./assets/personal_info.txt"], content_type=content_type)
+
+    response = client.response_wechat_xml(
+        message="""<xml>
+                          <ToUserName><![CDATA[toUser]]></ToUserName>
+                          <FromUserName><![CDATA[fromUser]]></FromUserName>
+                          <CreateTime>1348831860</CreateTime>
+                          <MsgType><![CDATA[text]]></MsgType>
+                          <Content><![CDATA[What is my name?]]></Content>
+                          <MsgId>1234567890123456</MsgId>
+                          <MsgDataId>xxxx</MsgDataId>
+                          <Idx>xxxx</Idx>
+                        </xml>""",
+        llm=get_llm(),
+        user=user
+    )
+    assert response[:5].lower() == "<xml>"
+    assert response[-6:].lower() == "</xml>"
+    assert "zhangwei" in response.lower()

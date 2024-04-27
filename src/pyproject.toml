@@ -15,6 +15,7 @@ keble-helpers = "^0"
 html2text = "^2024.2.26"
 tenacity = "^8.2.3"
 sentence-transformers = "^2"
+wechatpy = "^1.8.18"
 
 [tool.poetry.group.test.dependencies]
 pydantic-settings = "^2.2.1"
