@@ -6,19 +6,20 @@ authors = ["zhenhao-ma <bob0103779@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "<3.13,>=3.10"
 pydantic = "^2.3.0"
-qdrant-client = "^1.7.0"
-redis = "^5.0.0"
+langchain-chroma = "^0"
+langchain-community = "^0"
 langchain-openai = "^0.0.2.post1"
 keble-helpers = "^0"
-keble-chains = "^0"
-keble-db = "^0"
+html2text = "^2024.2.26"
 tenacity = "^8.2.3"
+sentence-transformers = "^2"
 
 [tool.poetry.group.test.dependencies]
 pydantic-settings = "^2.2.1"
 pytest = "^8.1.1"
+
 
 [build-system]
 requires = ["poetry-core"]
