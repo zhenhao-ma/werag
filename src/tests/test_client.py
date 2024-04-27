@@ -125,6 +125,37 @@ def test_save_as_url():
     assert found_key_phrase
 
 
+def test_save_as_url2():
+    prune_chroma(client._chroma)
+    urls = [
+        "https://www.ox.ac.uk/admissions/undergraduate/courses/course-listing"
+    ]
+    # create some data
+    user = "user_lorem"
+    content_type = "lorem_content_type"
+    client.save_urls(user=user, urls=urls, content_type=content_type, max_depth=2)
+    doc = client._chroma.get(
+        where={
+            "user": user
+        },
+        limit=10000
+    )
+    assert len(doc['documents']) > 0
+    found_key_phrase = False
+    key_phrases = ["Classical Archaeology and Ancient History", "History of Art", 'Psychology, Philosophy and Linguistics']
+    must_found_keyword = "Classical Civilisation"
+    must_found = False
+    for c in doc['documents']:
+        for kp in key_phrases:
+            if kp in c:
+                found_key_phrase = True
+                break
+        if must_found_keyword in c:
+            must_found = True
+
+    assert found_key_phrase
+    assert must_found
+
 def test_client_as_retriever():
     # create data
     prune_chroma(client._chroma)
