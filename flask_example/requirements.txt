@@ -8,4 +8,9 @@ redis~=5.0.3
 pydantic-settings~=2.2.1
 tenacity~=8.2.3
 
+
+langchain~=0.1.16
+werag~=0.0.0
+wechatpy~=1.8.18
+
 ../src/dist/werag-0.0.0-py3-none-any.whl
