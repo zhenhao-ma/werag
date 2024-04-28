@@ -1,6 +1,3 @@
-import os
-
-from langchain import HuggingFaceHub
 from langchain_chroma import Chroma
 from langchain_community.embeddings.sentence_transformer import (
     SentenceTransformerEmbeddings,

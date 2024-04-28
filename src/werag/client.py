@@ -7,9 +7,6 @@ from langchain.chains import LLMChain
 from langchain.document_transformers import Html2TextTransformer
 from langchain_community.document_loaders import TextLoader
 from langchain_community.document_loaders.recursive_url_loader import RecursiveUrlLoader
-from langchain_community.embeddings.sentence_transformer import (
-    SentenceTransformerEmbeddings,
-)
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
@@ -30,12 +27,10 @@ class WeRag:
     def __init__(self, *,
                  persist_directory: str,
                  collection_name: str = "werag",
-                 embedding_function: Optional[Embeddings] = None,
+                 embedding_function: Embeddings,
                  chunk_size: int = 1000,
                  chunk_overlap: int = 0):
         self._crud = CRUDChroma(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-        if embedding_function is None:
-            embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
         self._chroma = get_chroma(collection_name=collection_name, persist_directory=persist_directory,
                                   embedding_function=embedding_function)
 
