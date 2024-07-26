@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "werag"
-version = "0.0.4"
+version = "0.0.6"
 description = "python rag for wechat application"
 authors = ["zhenhao-ma <bob0103779@gmail.com>"]
 readme = "README.md"

@@ -17,6 +17,7 @@ from wechatpy import parse_message, create_reply
 from .crud import CRUDChroma
 from .db import get_chroma
 from .schema import UserContent
+from .utils import limit_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +30,15 @@ class WeRag:
                  collection_name: str = "werag",
                  embedding_function: Embeddings,
                  chunk_size: int = 1000,
-                 chunk_overlap: int = 0):
+                 chunk_overlap: int = 0,
+                 context_size: int = 2000,  # 限制context的token数量
+                 question_size: int = 1000  # 限制question的token数量
+                 ):
         self._crud = CRUDChroma(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         self._chroma = get_chroma(collection_name=collection_name, persist_directory=persist_directory,
                                   embedding_function=embedding_function)
+        self.__question_size = question_size
+        self.__context_size = context_size
 
     def as_retriever(self, *, user: str,
                      content_type: Optional[str] = None,
@@ -42,6 +48,15 @@ class WeRag:
             "filter": self._crud.get_user_content_filter(user=user, content_type=content_type),
             **kwargs
         }, search_type=search_type)
+
+    def similarity_search(self, *, query: str, user: str,
+                          content_type: Optional[str] = None,
+                          limit: int = 4) -> List[Document]:
+        return self._chroma.similarity_search(
+            query=query,
+            filter=self._crud.get_user_content_filter(user=user, content_type=content_type),
+            k=limit
+        )
 
     def save_content(self, *, user: str, content: str,
                      content_type: Optional[str] = None) -> UserContent:
@@ -115,22 +130,29 @@ class WeRag:
         parsed_message = parse_message(message)
         if parsed_message.type != "text": return create_reply("我目前只能响应文字内容", parsed_message, render=True)
 
+        # manually retrieve and limit tokens of RAG
+        docs = self.similarity_search(query=parsed_message.content, user=user, content_type=content_type)
+        context = limit_tokens("\n".join([doc.page_content for doc in docs]), max_token=self.__context_size)
+
         # Abstraction of Prompt
-        prompt = ChatPromptTemplate.from_template(prompt_template)
+        prompt = ChatPromptTemplate.from_template(prompt_template, partial_variables={
+            "context": context
+        })
 
         # Creating an LLM Chain
-
         llm_chain = LLMChain(llm=llm, prompt=prompt)
 
         # RAG Chain
         rag_chain = (
-                {"context": self.as_retriever(user=user, content_type=content_type),
+                {  # self.as_retriever(user=user, content_type=content_type),
                  "question": RunnablePassthrough()}
                 | llm_chain
         )
         response_text = None
         try:
-            response_text = rag_chain.invoke(parsed_message.content)
+            response_text = rag_chain.invoke(
+                limit_tokens(parsed_message.content, max_token=self.__question_size)
+            )
             return create_reply(response_text['text'], parsed_message, render=True)
         except Exception as e:
             logger.critical(f"Failed to get response from LLM, exception: {e}, response: {response_text}")
